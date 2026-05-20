@@ -3,5 +3,5 @@ This analysis is initially part of STAA57 final project, with additional changes
 
 ## Quick Links
 * [Read the Full PDF Report](./ontario-compensation-report.pdf)
-* [Explore the R-Markdown Code]
+* [Explore the R-Markdown Code](./ontario-compensation-analysis.Rmd)
 * [Access the Dataset](./dataset/README.md)

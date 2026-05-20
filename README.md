@@ -12,3 +12,13 @@ This project utilizes the 2020 public salary disclosure compendium (commonly kno
 
 ### Business Objective
 From an analytics and organizational management perspective, this project evaluates the baseline compensation design structures of public institutions by seeking to answer one specific question: "Can we accurately predict the job sector of a public employee given only their taxable employee benefits and base salary?"
+
+## Data Structure Overview
+The analysis was performed on a dataset consisting of $N = 171,365$ clean public sector observations. To ensure an optimized predictive performance with minimal distributional bias, the scope was narrowed down to the five largest employment sectors in the dataset:
+| Sector Code | Public Department Industry |
+| :--- | :--- |
+| Mun | Municipalities and Services |
+| Sch | School Boards |
+| Hosp | Hospitals & Boards of Public Health |
+| Uni | Universities |
+| Minst | Government of Ontario Ministries |

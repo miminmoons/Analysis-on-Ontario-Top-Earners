@@ -28,7 +28,11 @@ The analysis was performed on a dataset consisting of $N = 171,365$ clean public
 * Salary: Continuous financial metric measuring the baseline annual earnings of each top earner.
 * Benefits: Continuous financial metric tracking the taxable bonus additions provided by respective employers.
 
-### Model Features
-[ Salary Variable ] ───┐
-                       ├───> [ Machine Learning Decision Tree Model ] ───> [ Predicts Job Sector ]
-[ Benefits Variable ] ─┘
+## Executive Summary
+An initial comprehensive overview confirms that while base compensation packages across public sectors generally follow normal distributions, the real differentiation lies in the allocation behavior of non-salary perks and taxable benefits.
+
+By training a tuned machine learning classification model on purely financial paycheck entries, the algorithm achieved a mean cross-validated accuracy rate of 64.88% across five distinct sectors, with a Cohen's Kappa statistic of 0.5331. This predictive capability significantly outstrips the baseline 20% random-chance threshold, mathematically demonstrating that distinct public industries maintain stark, systematic variances in how they reward upper-tier personnel.
+
+## Insights Deep Dive
+### **The 4x Dominance of Benefits over Salary**
+Variable importance tracking yielded an extraordinary structural finding: Taxable employee benefits account for 79.78% of the classification model’s predictive power, while base salary accounts for just 20.22%. This reveals that benefit-based perks are nearly four times more predictive of a public sector worker's exact industry than the baseline amount on their check.

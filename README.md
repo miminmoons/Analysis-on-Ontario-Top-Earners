@@ -39,8 +39,8 @@ Variable importance tracking yielded an extraordinary structural finding: Taxabl
 
 ### 2. *Divergent Allocation Profiles (Universities vs. Municipalities)*
 Bootstrapped 95% confidence interval testing on 1,000 resamples isolated completely separate corporate compensation philosophies:
-* Base-Pay Heavy (Universities): Holding the highest median salary spectrum in the province ($148,293; 95% CI: $147,467–$149,146), Universities heavily skew their compensation towards guaranteed base salary rather than floating additions.
-* Benefit-Heavy (Municipalities): Conversely, Municipalities maintain mid-tier base salaries ($117,452) but hold the undisputed highest average employee benefit yields ($989; 95% CI: $976–$1,001).
+* **Base-Pay Heavy (Universities):** Holding the highest median salary spectrum in the province ($148,293; 95% CI: $147,467–$149,146), Universities heavily skew their compensation towards guaranteed base salary rather than floating additions.
+* **Benefit-Heavy (Municipalities):** Conversely, Municipalities maintain mid-tier base salaries ($117,452) but hold the undisputed highest average employee benefit yields ($989; 95% CI: $976–$1,001).
 
 ### 3. *Statistical Validation of Pairwise Discrepancies*
 Simultaneous evaluation using a One-Way ANOVA definitively rejected the null hypothesis that sector benefit averages are globally equal ($F(4,171365) = 2669$, $p < 2 \cdot 10^{-16}$). Post-hoc Tukey HSD testing confirmed that all 10 possible pairwise industry combinations are entirely statistically significant.

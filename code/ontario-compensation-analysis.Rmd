@@ -1,0 +1,493 @@
+---
+output: 
+  pdf_document:
+    citation_package: natbib
+    keep_tex: true
+    fig_caption: true
+    latex_engine: pdflatex
+    template: svm-latex-ms.tex
+bibliography: master.bib
+header-includes:
+  - \usepackage{hyperref}
+  - \usepackage{array}   
+  - \usepackage{caption}
+  - \usepackage{graphicx}
+  - \usepackage{siunitx}
+  - \usepackage[table]{xcolor}
+  - \usepackage{multirow}
+  - \usepackage{hhline}
+  - \usepackage{calc}
+  - \usepackage{tabularx}
+  - \usepackage{fontawesome}
+  - \usepackage[para,online,flushleft]{threeparttable}
+biblio-style: apsr
+title: "Analysis on Ontario's Top Earners"
+thanks: "This report is produced with template from Steven V. Miller of Clemson University (http://github.com/svmiller)."
+author:
+- name: Jasmine Willy Saphira
+- name: Brayden Andersen Lim
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+geometry: margin=1in
+fontfamily: libertine
+fontsize: 11pt
+# spacing: double
+endnote: no
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE,
+                      message=FALSE, warning=FALSE,
+                      fig.path='figs/',
+                      cache.path = '_cache/',
+                      fig.process = function(x) {
+                      x2 = sub('-\\d+([.][a-z]+)$', '\\1', x)
+                      if (file.rename(x, x2)) x2 else x
+                      })
+```
+
+```{r Libraries, echo = FALSE, message = FALSE, warning = FALSE}
+library(tidyverse)
+library(tidyr)
+library(dplyr)
+library(stringr)
+library(readr)
+
+library(broom) # For tidying model outputs
+library(boot) # For bootstrapping
+library(rpart) # For Decision Trees
+library(rpart.plot)
+library(rattle)
+library(caret) # For Cross-Validation
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+library(ggfortify)
+```
+
+```{r Data Cleaning, echo = FALSE}
+# Salary Dataset
+salary_all <- read_csv("en-2020-pssd-compendium.csv", 
+  show_col_types = FALSE)
+
+# Cleaned Salary Dataset
+# Numeric Salary & Benefits; Top 5 Sector; >$100,000
+# New Variable 'Benefit_Salary_Ratio'; Shortened Variable Name
+salary_cleaned <- salary_all %>%
+  mutate(
+    Salary = parse_number(Salary),
+    Benefits = parse_number(Benefits)) %>%
+  filter(Sector %in% c(
+    "Municipalities & Services",
+    "School Boards",
+    "Hospitals & Boards of Public Health",
+    "Universities",
+    "Government of Ontario – Ministries"
+  )) %>%
+  filter(Salary >= 100000) %>%
+  mutate(Benefit_Salary_Ratio = Benefits/Salary) %>%
+  mutate(Sector = case_when(
+    Sector == "Municipalities & Services" ~ "Mun",
+    Sector == "School Boards" ~ "Sch",
+    Sector == "Hospitals & Boards of Public Health" ~ "Hosp",
+    Sector == "Universities" ~ "Uni",
+    Sector == "Government of Ontario – Ministries" ~ "Minst"
+  ))
+
+# Check if the data cleaning is correct
+# summary(salary_cleaned$Salary)
+# table(salary_cleaned$Sector)
+```
+
+# 1. Introduction
+
+In a predominantly corporate-driven landscape, Ontario's public sector accounted for a substantial 19.4% of total provincial employment in 2020. From healthcare and education to various government bodies, these workers serve as vital components of Ontario’s urban areas, forming the very backbone of the province. This report explores the top earners[^1] from various public sectors and compare how their salaries get reflected by the employee benefits they receive.
+
+# 2. Research Questions
+
+The premise of this report is to analyze the employee benefit of Ontario’s top earners across different sectors. This report seek to answer one specific question: **‘Can we accurately predict the job sector of a public employee given their employee benefits and salaries?’**
+
+
+# 3. Background and Description of Dataset
+
+The dataset utilized for this report was collected by the Treasury Board Secretariat of Ontario in 2020. As part of ‘The Public Sector Salary Disclosure Act, 1996’, the provincial government mandates that the earnings of all top earners in Ontario to be disclosed as what many would come to know as the ‘Sunshine List’. This mandate was designed to promote transparency and accountability amongst tax payers. This dataset can be broken down into the following variables:
+
+* Sector: The departments in which each top earner falls under.
+* Salary: The annual earnings of each top earner in Ontario in 2020.
+* Benefits: Taxable ‘bonus’ given by their respective employers.
+
+For the purpose of this research, the analysis will be narrowed down to the five biggest sectors on the list:
+
+* Municipalities and Services (Mun)
+* School Boards (Sch)
+* Hospital & Boards of Public Health (Hosp)
+* Universities (Uni)
+* Government of Ontario (Mist)
+
+By excluding sectors with smaller sample sizes and eliminating imbalanced distributions, the report focuses on accuracy with minimal bias.
+
+[^1]: Public Employees with an annual salary of *$\geq 100,000$
+
+# 4. Methodology & Analysis
+
+## 4.1. Hypothesis Testing (ANOVA)
+The hypothesis testing will build the foundation to highlight the differences in employee benefits across five sectors. Thus, our hypotheses are the following:
+
+- Null Hypothesis ($\textbf{H}_0$): $\mu_{Mun} = \mu_{Sch} = \mu_{Hosp} = \mu_{Uni} = \mu_{Minst}$\ (ie. Means of all sectors are equal)
+
+- Alternative Hypothesis ($\textbf{H}_a$): At least one mean is different
+
+To evaluate our hypotheses, we conduct one-way analysis of variance (One-Way ANOVA), since we are comparing all five sectors simultaneously.
+
+```{r ANOVA, echo = FALSE, tidy = TRUE}
+anova_results <- aov(Benefits ~ Sector, data = salary_cleaned)
+summary(anova_results)
+```
+From this One-Way ANOVA summary. The summary indicates an *F-statistic* of $F(4, 171365) = 2669,$ and
+$p-value < 2\cdot 10^{-16} < 0.001$. Given that the p-value is significantly smaller than
+the alpha of $0.05$, the null hypothesis is ultimately rejected. Hence, we reject the hypothesis that all the means are equal. \
+
+As the hypothesis testing involved five distinct groups rather than two,applying t-test to all pairwise combinations across the five groups runs the risk of it producing a Type-1 error (false positive). Hence, we have resorted to Tukey HSD post-hoc test, a tool from outside the syllabus. This test method will allow comparison between all pair-wise combinations and prevent any potential type-1 errors.
+
+```{r Tukey, echo = FALSE}
+tukey_results <- TukeyHSD(anova_results)
+
+tukey_table <- tidy(tukey_results) %>%
+  # Remove redundant columns
+  select(-term, -null.value) %>%
+  
+  # Format p-value
+  mutate(adj.p.value = ifelse(adj.p.value < 0.001, "< 0.001", round(adj.p.value, 4))) %>%
+  
+  # Rename columns
+  rename(
+    Comparison = contrast,
+    'Estimate (CAD)' = estimate,
+    'Lower CI (CAD)' = conf.low,
+    'Upper CI (CAD)' = conf.high,
+    'p-value (adj)' = adj.p.value
+  )
+
+kable(tukey_table,
+      digits = 2,
+      caption = "Pairwise Comparisons of Employee Benefits across Public Sectors (Tukey HSD)",
+      align = 'lrrrr')
+```
+This table compares the benefits of two pairwise sectors. The data is intepreted as the following:
+
+The difference  between $sector1-sector2$ is simply $sector1$ $minus$ $sector2$. \
+
+The adjusted p-values for all of the comparisons are less than 0.001. While this is rare in smaller studies, it is expected here given our large sample size of ($N = 171,365$). This high statistical power allows us to confirm that even smaller differences, like the $\sim \$71$ difference between Schools and Government, are true structural differences in the market and not random noise.
+
+```{r Tukey Plot, echo = FALSE, out.width="50%", fig.align='center'}
+tukey_df <- as.data.frame(tukey_results$Sector)
+tukey_df$contrast <- rownames(tukey_df)
+colnames(tukey_df) <- c("estimate", "conf.low", "conf.high", "p.value", "contrast")
+
+ggplot(tukey_df, aes(x = estimate, y = contrast)) +
+  geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), height = 0.2) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "95% Family-Wise Confidence Levels (Employee Benefits)",
+       x = "Difference in Mean Benefits ($)",
+       y = "Sector Comparisons") +
+  theme_minimal()
+```
+
+The Tukey HSD plot clearly illustrates that employee benefits differ across the different public secctos. Out of the 10 possible pairwise comparisons, every single one is statistically significant, evident by the fact that none of the 95% confidence interval bars cross the zero-difference threshold. \
+
+From the 10 possible pairwise sector comparisons, we notice that the **Schools-Ministries** pair have the smallest difference in mean benefits with a -$\$ 70.96$ difference, followed by **University-Hospital** with $\$ 87.77$ mean benefits difference. \
+
+The **Schools-Municipalities** and **Municipalities-Ministries** pairs have the most difference in mean benefits, with employees in the **Municipalities** sector receiving approximately $>\$ 500$ more compared to the '*Schools*' and '*Ministries*' sectors in employee benefit. As shown in table 1, '*Municipalities*' employees received an estimate of $\$ 857.98$ more in employee benefits compared to '*Schools*' employee. Even at the lower bound of our estimate, the difference remains a substantial $\$ 833.63$. \
+
+On average, employees from the '*Municipalities*' sector received an estimate of $\$ 787.02$ more in employee benefits compared to the '*Ministries*' sector, with $\$ 755.11$ being the lower bound and $\$818.93$ being the upper bound of our estimate.
+
+## 4.2. Bootstrapping & Confidence Intervals
+
+Bootstrapping will be done to the median of the annual salary and the mean of the benefits, which then can be used to estimate the sampling distribution of the employee benefits of each sector, and to compute the confidence intervals. \
+
+The median of the annual salary will be used in favor of the mean, to prevent skewed data entries (e.g. few people that earns $\geq \$ 1$ million) to hinder the accuracy of our estimate. \
+
+As for the benefits, the average will be used since they are smaller and fixed amounts. \
+
+```{r Samples Bootstrap, echo = FALSE, cache = TRUE}
+set.seed(123456789)
+
+boot_samples <- salary_cleaned %>%
+  group_by(Sector) %>%
+  summarise(
+    salary_samples = list(replicate(n = 1000,
+                                  median(sample(Salary, replace = TRUE)))),
+    benefit_samples = list(replicate(n = 1000,
+                                  mean(sample(Benefits, replace = TRUE))))
+  )
+
+# glimpse(boot_samples)
+```
+
+```{r Table Bootstrap, echo = FALSE}
+boot_table <- boot_samples %>%
+  mutate(
+    salary_median = map_chr(salary_samples, ~format(round(median(.x), 0), big.mark=",")),
+    salary_median_95ci = map_chr(salary_samples, ~{
+      ci <- quantile(.x, c(0.025, 0.975))
+      paste0("(", format(round(ci[1], 0), big.mark=","), ", ", 
+             format(round(ci[2], 0), big.mark=","), ")")}),
+    benefits_mean = map_chr(benefit_samples, ~format(round(mean(.x), 0), big.mark=",")),
+    benefits_mean_95ci = map_chr(benefit_samples, ~{
+      ci <- quantile(.x, c(0.025, 0.975))
+      paste0("(", format(round(ci[1], 0), big.mark=","), ", ", 
+             format(round(ci[2], 0), big.mark=","), ")")})
+  ) %>%
+  select(Sector, salary_median, salary_median_95ci, benefits_mean, benefits_mean_95ci)
+
+# View the results
+kable(boot_table,
+      col.names = c("Sector", "Median", "Median (95% CI)", "Mean", "Mean (95% CI)"),
+      caption = "Sector Compensation Profiles (Bootstrapped 95\\% Confidence Intervals)",
+      align = 'lcccc') %>%
+  add_header_above(c(" " = 1, "Annual Salary (CAD)" = 2, "Employee Benefits (CAD)" = 2)) %>%
+  kable_styling(full_width = FALSE, position = "center")
+```
+
+Although the ANOVA analysis showed that the **Municipalities** sector have the highest benefits, the Bootstrap analysis shows that the **Universities** sector hold the highest median salary. This suggests that University compensation is weighted toward base pay, while Municipal compensation is more benefit-heavy. \
+
+Our bootstrap analysis shows that the **Universities** sector offers the highest salary, with a median salary range of $\$147,467 - \$149,146$. This sits significantly higher than School Boards, which represent the lower end of the salary spectrum, with a median salary range of $\$103,431 - \$103,499$. \
+
+Interestingly, the sectors with the highest salaries are not necessarily matched with the highest benefits. While **Municipalities** sit in the middle for base salary, they possess the highest average employee benefits. \
+
+### 4.2.1. Bootstrap Sampling Distribution for Median Salary
+
+The bootstrap sampling distribution for Median Salary is illustrated in the following diagrams. Since there are notable differences between the density of different sectors, the density plot will be separated into five different diagrams. Faceting allows each sector to be visualized on its own relative scale while maintaining a common x-axis for direct salary comparison.
+
+```{r Density Plot: Salary, echo = FALSE, fig.align='center', out.width="75%"}
+# Unnest the bootstrap samples
+salary_long <- boot_samples %>%
+  select(Sector, salary_samples) %>%
+  unnest(cols = c(salary_samples))
+
+ggplot(salary_long, aes(x = salary_samples, fill = Sector, color = Sector)) +
+  geom_density(alpha = 0.1, linewidth = 0.5) +
+  facet_wrap(~Sector, scales = "free_y", ncol = 1) +
+  theme_minimal() +
+  labs(title = "Bootstrapped Sampling Distributions of Median Salary",
+       subtitle = "Faceted to account for varying precision across Sectors",
+       x = "Median Salary (CAD)",
+       y = "Density") +
+  scale_fill_brewer(palette = "Set2") +
+  scale_color_brewer(palette = "Set2") + 
+  theme(axis.text.y = element_text(size = 8),
+        plot.margin = margin(l = 15, r = 5, t = 5, b = 5))
+```
+
+The density plots show that all of the distributions follow a normal distribution. However, despite the varying density peaks, the density plots all follow a distinct medain salary range, signalling that the five sectors all have different median salaries.
+
+### 4.2.2. Bootstrap Sampling Distribution for Mean Benefit
+
+The bootstrap sampling distribution for Average Benefits are illustrated in the following diagrams. Similarly, there are notabble differences between the density of different sectors, therefore, the density plots are separated into five different diagrams.
+
+```{r Density Plot: Benefits, echo = FALSE, fig.align='center', out.width="75%"}
+# Unnest the bootstrap samples
+benefit_long <- boot_samples %>%
+  select(Sector, benefit_samples) %>%
+  unnest(cols = c(benefit_samples))
+
+ggplot(benefit_long, aes(x = benefit_samples, fill = Sector, color = Sector)) +
+  geom_density(alpha = 0.1, linewidth = 0.5) +
+  facet_wrap(~Sector, scales = "free_y", ncol = 1) +
+  theme_minimal() +
+  labs(title = "Bootstrapped Sampling Distributions of Avg Benefits",
+       subtitle = "Faceted to account for varying precision across Sectors",
+       x = "Avg Benefits (CAD)",
+       y = "Density") +
+  scale_fill_brewer(palette = "Set2") +
+  scale_color_brewer(palette = "Set2") + 
+  theme(axis.text.y = element_text(size = 8),
+        plot.margin = margin(l = 15, r = 5, t = 5, b = 5))
+```
+
+Once again, all of the density plots follow a normal distribution, and despite the varying density peaks, the five sectors have distinct ranges of mean benefits.
+
+## 4.3. Multiple Linear Regression
+
+For the purpose of this report, there will be two different predictors (*$Salary$* and *$Sectors$*) for the linear regression analysis. These two predictors will demonstrate their relationship with the *$Benefits$*. This allows for a more comprehensive perspective to how the benefits compare, to not only the *$Sectors$*, but both predictors simultaneously. \
+
+### 4.3.1. Linear Regression Model
+
+To optimize the model of the multiple regression analysis, we will consider two different approaches. The first multiple linear regression is the 'Main Effect' model, which assumes that the relationship between each individual independent variables and dependent variable doesx not impact one another. On the other hand, the 'Interaction' model assumes that the impacts of one predictor also depends on another predictor.
+
+```{r Model Regression, echo = FALSE}
+model_additive <- lm(Benefits ~ Salary + Sector, data = salary_cleaned)
+model_interaction <- lm(Benefits ~ Salary * Sector, data = salary_cleaned)
+
+anova(model_additive, model_interaction)
+```
+
+The ANOVA analysis showed a comparison betweenthe 'Main Effect' and 'Interaction' Models. The partial *F-test* yielded an *F-statistic* of 1482.4 with a *p-value* approaching zero. This ANOVA indicates that adding the interaction terms significantly reduced the residual sum of squares, making the additive model obsolete for our final interpretation.
+
+### 4.3.2. Interpretation of Regression Parameters
+
+```{r Model Interpretation, echo = FALSE}
+kable(tidy(model_interaction))
+```
+
+Using the **Hospitals** sector as the reference baseline, the interaction model shows significant variations in how salary increase translates to taxable benefits across the five sectors.
+
+- Intercept (-$\$1383.21$): The theoretical baseline taxable benefit for a Hospital employee when their salary is zero. (Note zero here means $\$100,000$ as the salaries in this dataset are at least $\$100,000$ )
+
+- Salary (0.0162): For every $1 increase in a Hospital employee's base salary, their taxable benefits increase by approximately 1.62 cents.
+
+Relative differences between sectors (Main Effect): Holding salary constant, employees in other sectors start with different baseline benefit modifiers. For example, Ministry employees (SectorMinst: 1,032.7) begin with an estimated $\$1,032$ more in foundational benefits than Hospital workers, while University employees (SectorUni: 1235.2) begin with $\$1,235$ more.
+
+- SectorMinst $(1,032.7)$: Ministry employees start with $\$1,032$ more in base benefits than Hospital employees.
+
+- SectorMun $(-905.81)$: Municipalil employees start with $\$906$ less in base benefits than Hospital employees.
+
+- SectorSch -$(124.95)$: School board employees start with $\$125$ less in base benefits than Hospital employees.
+
+- SectorUni $(-1,235.28)$: University employees start with $\$1,235.28$ less in base benefits than Hospital employees.
+
+Interaction Effects (Rate of Change): The interaction terms dictate how the rate of benefit growth differs from the Hospital baseline.
+
+- Salary:SectorMinst $(-0.0119)$: For every $1 in salary, Ministry employees get 1.19 cents less in benefits compared to the Hospital rate.
+
+- Salary:SectorMun $(0.0103)$: For every $1 in salary, Municipal employees get an extra 1.03 cents in benefits compared to the Hospital rate.
+
+- Salary:SectorSch $(-0.0012)$: For every $1 in salary, School board employees get 0.12 cents less in benefits compared to the Hospital rate.
+
+- Salary:SectorUni $(0.0103)$: For every $1 in salary, University employees get an extra 1.03 cents in benefits compared to the Hospital rate.
+
+## 4.4. Decision Tree
+
+The decision tree will inevitably be the core tool of our analysis as the study aims to categorize the different sectors and accurately predict the sector with the given input. While Random Forest may provide a more comprehensive approach to predict the sectors, a decision tree highlights the mapping logic with the limited parameters that the dateset provides.
+
+
+### 4.4.1. Decision Tree Model
+
+```{r DT Model, echo = FALSE, fig.width=14, fig.height=10}
+set.seed(123456789)
+
+# Stratified split: take 20% of each sector for testing (at least 1 observation)
+test_data <- salary_cleaned %>%
+  group_by(Sector) %>%
+  slice_sample(prop = 0.2) %>%
+  ungroup()
+
+# Training data = all rows not in test_data
+train_data <- salary_cleaned %>%
+  anti_join(test_data, by = colnames(salary_cleaned))
+
+# Train decision tree
+tree <- rpart(Sector ~ Salary + Benefits,
+              data = train_data,
+              method = "class")
+
+# Plot tree
+fancyRpartPlot(tree,
+           main = "Decision Tree: Sector ~ Salary + Benefits",
+           sub = "Classification tree showing how annual salary and taxable benefits separate public sectors.\nNode labels: predicted sector, probability of membership, percentage of observations.",
+           caption = NULL,
+           palettes = c("Greens", "Blues", "Oranges", "Purples", "Reds"),
+           type = 2
+)
+```
+
+
+
+### 4.4.2. Decision Tree Variable Importance
+
+```{r DT Variable Importance, echo = FALSE}
+# Variable Importance
+importance_data <- data.frame(
+  Variable = names(tree$variable.importance),
+  Importance_Score = as.numeric(tree$variable.importance)
+) %>%
+  mutate(Percentage = (Importance_Score / sum(Importance_Score)) * 100) %>%
+  arrange(desc(Importance_Score))
+
+# Render the kable
+importance_data %>%
+  kable(
+    caption = "Variable Importance for Sector Classification",
+    col.names = c("Predictor Variable", "Raw Importance Score", "Contribution (%)"),
+    digits = 2,
+    align = "lcc"
+  ) %>%
+  kable_styling(full_width = F, position = "center", bootstrap_options = c("striped", "bordered")) %>%
+  column_spec(1, bold = TRUE) %>%
+  row_spec(0, bold = TRUE)
+```
+
+The variable importance metrics resulted to a staggering conclusion: Employee Benefits account for 79.78% of the model's predictive power, leaving Base Salary to account for only 20.22%. This proves that benefits and non-salary perks play a more dominant role to predict a public sector job. \
+
+Utilizing a stratified 80/20 train-test split, the decision tree achieved a baseline accuracy on unseen data that effectively separated heavily-benefited Municipal workers from strictly-salaried University and School Board workers.
+
+## 4.5. K-Fold Cross Validation
+
+```{r K-Fold Cross Validation, echo = FALSE}
+k = 10
+
+train_control <- trainControl(method = "cv",
+                              number = k,
+                              classProbs = FALSE,
+                              summaryFunction =  defaultSummary,
+                              savePredictions = TRUE)
+
+set.seed(123456789)
+cv_model <- train(Sector ~ Salary + Benefits,
+                  data = salary_cleaned,
+                  method = "rpart",
+                  trControl = train_control,
+                  na.action = na.omit)
+
+cv_summary <- cv_model$results %>%
+  select(cp, Accuracy, Kappa) %>%
+  arrange(desc(Accuracy)) %>%
+  slice(1)
+
+best_row <- which.max(cv_model$results$Accuracy)
+best_cp <- cv_model$results$cp[best_row]
+
+cv_summary_table <- data.frame(
+  Statistic = c("Mean CV Accuracy", "Mean CV Kappa", "Best Complexity (cp)", "Number of Folds (k)"),
+  Value = c(
+    paste0(round(cv_summary$Accuracy * 100, 2), "%"),
+    round(cv_summary$Kappa, 4),
+    round(best_cp, 5),
+    k
+  )
+)
+
+cv_summary_table %>%
+  kable(caption = "K-Fold Cross-Validation Performance Summary", 
+        align = "lc",
+        booktabs = TRUE) %>%
+  kable_styling(full_width = F, position = "center") %>%
+  column_spec(1, bold = TRUE) %>%
+  row_spec(0, bold = TRUE)
+```
+
+The model is trained iteratively on k-1 folds and validated on the remaining holdout fold. Using k=10, our model was subjected to 10 distinct testing phases. The results signals a Mean Cross-Validated Accuracy of 64.88% and a Mean Kappa statistic of 0.5331. Given that the scope of this analysis is to attempt to classify public employees into one of five distinct sectors using only two financial variables, an accuracy of nearly 65% (far exceeding the 20% random-chance baseline) represents a highly robust predictive performance. The Kappa statistic further confirms moderate to strong agreement beyond chance.
+
+# 5. Conclusion and Discussions
+
+## 5.1. Summary of Findings
+
+The findings of this report have given significant insights on how the salary and benefits of a public employee helps shape a predictive model to accurately dictate which sector they belong to. Hypothesis testing and bootstrapping confirmed that while base salaries across government sectors follow similar trajectories, employee benefit vary drastically. Regression Modeling highlights the contrast between sectors that prioritize base salaries over additional benefits, and those who gives benefits 'proportional' to the employees' benefits. Finally, the variable importance metrics concluded that employee benefits are approximately four times as predictive of an employee's industry/sector than their annual salary.
+
+## 5.2. Conclusions
+
+Circling back to the main event, the research question: **'How can we accurately predict the job sector of a public employee given their employee benefits and salaries?’**. The short answer is Yes, we can 'accurately' predict their job sector by the given metrics. We can predict a public employee's job sector with roughly 65% accuracy using only their paycheck data. This accuracy is heavily reliant on the allocation of taxable benefits. However, the results of this statistical tool should always be taken with a grain of salt, as it does not guarantee a 100% definitive answer.
+
+## 5.3. Limitations
+
+The primary limitation of this analysis report is the very fact that the report had very little variables/metrics to work with, as we are trying to accurately predict the employee's industry. The limited predictors and parameters did not allow for a more comprehensive decsion tree and random forest analysis, which could have significantly impacted the accuracy rate of our prediction model. \
+
+Another major limitation is that the published data are only for employees with salary of $\$100,000$ and up. Therefore this analysis only represents public employees that are senior-level and executives, and does not represent the broader population of Ontario. 
+
+
+# 6. References
+
+- Government of Ontario. (2020). Ontario employment reports: January–December 2020. https://www.ontario.ca/document/ontario-employment-reports/january-december-2020
+
+- Government of Ontario. (n.d.). Public sector salary disclosure. Retrieved April 6, 2026, from https://www.ontario.ca/page/public-sector-salary-disclosure
+
+- Soetewey, A. (2020, October 12). *ANOVA in R.* Stats and R. https://statsandr.com/blog/anova-in-r/

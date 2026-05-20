@@ -34,24 +34,24 @@ An initial comprehensive overview confirms that while base compensation packages
 By training a tuned machine learning classification model on purely financial paycheck entries, the algorithm achieved a mean cross-validated accuracy rate of 64.88% across five distinct sectors, with a Cohen's Kappa statistic of 0.5331. This predictive capability significantly outstrips the baseline 20% random-chance threshold, mathematically demonstrating that distinct public industries maintain stark, systematic variances in how they reward upper-tier personnel.
 
 ## Insights Deep Dive
-### 4x Dominance of Benefits over Salary
+### *4x Dominance of Benefits over Salary*
 Variable importance tracking yielded an extraordinary structural finding: Taxable employee benefits account for 79.78% of the classification model’s predictive power, while base salary accounts for just 20.22%. This reveals that benefit-based perks are nearly four times more predictive of a public sector worker's exact industry than the baseline amount on their check.
 
-### Divergent Allocation Profiles (Universities vs. Municipalities)
+### *Divergent Allocation Profiles (Universities vs. Municipalities)*
 Bootstrapped 95% confidence interval testing on 1,000 resamples isolated completely separate corporate compensation philosophies:
 * Base-Pay Heavy (Universities): Holding the highest median salary spectrum in the province ($148,293; 95% CI: $147,467–$149,146), Universities heavily skew their compensation towards guaranteed base salary rather than floating additions.
 * Benefit-Heavy (Municipalities): Conversely, Municipalities maintain mid-tier base salaries ($117,452) but hold the undisputed highest average employee benefit yields ($989; 95% CI: $976–$1,001).
 
-### Statistical Validation of Pairwise Discrepancies
+### *Statistical Validation of Pairwise Discrepancies*
 Simultaneous evaluation using a One-Way ANOVA definitively rejected the null hypothesis that sector benefit averages are globally equal ($F(4,171365) = 2669$, $p < 2 \cdot 10^{-16}$). Post-hoc Tukey HSD testing confirmed that all 10 possible pairwise industry combinations are entirely statistically significant.
 
 Even the minor historical difference between School Boards and Ministries (~$71 variance) represents a true structural market variance rather than a random noise signature.
 
 ## Libraries Used
-* Data Wrangling: tidyverse, dplyr, stringr, readr, tidyr
-* Statistical Modeling & Machine Learning: broom, boot, rpart, caret
-* Data Visualization & Formatting: ggplot2, rpart.plot, rattle, knitr, kableExtra
+* **Data Wrangling:** tidyverse, dplyr, stringr, readr, tidyr
+* **Statistical Modeling & Machine Learning:** broom, boot, rpart, caret
+* **Data Visualization & Formatting:** ggplot2, rpart.plot, rattle, knitr, kableExtra
 
 ## Project Context & Data Attribution
-* Development History: This analysis originated as a final project for STAA57 course. The repository hosted here represents an expanded portfolio version featuring updated structural regression visualizations, optimized code refactoring, and enhanced documentation.
-* Data Source: All primary analysis relies on the official 2020 public compendium collected and published by the Treasury Board Secretariat of Ontario under the Public Sector Salary Disclosure Act, 1996.
+* **Development History:** This analysis originated as a final project for STAA57 course. The repository hosted here represents an expanded portfolio version featuring updated structural regression visualizations, optimized code refactoring, and enhanced documentation.
+* **Data Source:** All primary analysis relies on the official 2020 public compendium collected and published by the Treasury Board Secretariat of Ontario under the Public Sector Salary Disclosure Act, 1996.

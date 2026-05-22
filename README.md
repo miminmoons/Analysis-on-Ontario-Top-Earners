@@ -53,5 +53,5 @@ Even the minor historical difference between School Boards and Ministries (~$71 
 * **Data Visualization & Formatting:** ggplot2, rpart.plot, rattle, knitr, kableExtra
 
 ## Project Context & Data Attribution
-* **Development History:** This analysis originated as a final project for STAA57 course. The repository hosted here represents an expanded portfolio version featuring updated structural regression visualizations, optimized code refactoring, and enhanced documentation.
+* **Development History:** This analysis originated as a final project for STAA57 course, which received 100/100. The repository hosted here represents an expanded portfolio version featuring updated structural regression visualizations, optimized code refactoring, and enhanced documentation.
 * **Data Source:** All primary analysis relies on the official 2020 public compendium collected and published by the Treasury Board Secretariat of Ontario under the Public Sector Salary Disclosure Act, 1996.
